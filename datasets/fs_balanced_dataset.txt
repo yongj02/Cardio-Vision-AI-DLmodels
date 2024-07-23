@@ -1,0 +1,36 @@
+Base features: 19
+GA(9): ['Patient age quantile', 'Hematocrit', 'Red blood Cells', 'Leukocytes', 'Eosinophils', 'Urea', 'Proteina C reativa mg/dL', 'Creatinine', 'Aspartate transaminase', 'Label']
+RF(9): ['Leukocytes', 'Platelets', 'Monocytes', 'Eosinophils', 'Hematocrit', 'Red blood Cells', 'Proteina C reativa mg/dL', 'Lymphocytes', 'Hemoglobin', 'Label']
+RFE(9): ['Hematocrit', 'Platelets', 'Red blood Cells', 'Lymphocytes', 'Leukocytes', 'Eosinophils', 'Monocytes', 'Proteina C reativa mg/dL', 'Creatinine', 'Label']
+RFECV(10): ['Hematocrit', 'Hemoglobin', 'Platelets', 'Red blood Cells', 'Lymphocytes', 'Leukocytes', 'Eosinophils', 'Monocytes', 'Proteina C reativa mg/dL', 'Creatinine', 'Label']
+GWO(5): ['Platelets', 'Red blood Cells', 'Leukocytes', 'Monocytes', 'Urea', 'Label']
+WOA(5): ['Hematocrit', 'Leukocytes', 'Monocytes', 'Potassium', 'Aspartate transaminase', 'Label']
+HHO(5): ['Red blood Cells', 'Lymphocytes', 'Eosinophils', 'Neutrophils', 'Sodium', 'Label']
+FA(8): ['Hematocrit', 'Platelets', 'Red blood Cells', 'Leukocytes', 'Monocytes', 'Serum Glucose', 'Urea', 'Alanine transaminase', 'Label']
+CS(7): ['Platelets', 'Red blood Cells', 'Leukocytes', 'Eosinophils', 'Monocytes', 'Serum Glucose', 'Urea', 'Label']
+BA(5): ['Hematocrit', 'Platelets', 'Red blood Cells', 'Basophils', 'Urea', 'Label']
+
+
+Duration: 100 ~ 120 minutes
+Model: WOCLSA
+(0.33272886276245117, 0.8999999761581421, 0.9010416865348816, 0.9010416865348816, 0.9010416269302368, 0.6563623292595255)
+Model: GA-WOCLSA
+(0.30168718099594116, 0.8916666507720947, 0.8932291865348816, 0.8932291865348816, 0.8932291269302368, 0.7570093457943925)
+Model: RF-WOCLSA
+(0.2735568881034851, 0.8999999761581421, 0.9036458134651184, 0.9036458134651184, 0.9036457538604736, 0.8432782171099928)
+Model: RFE-WOCLSA
+(0.2827892005443573, 0.8916666507720947, 0.8932291865348816, 0.8932291865348816, 0.8932291269302368, 0.7994248741912293)
+Model: RFECV-WOCLSA
+(0.31098508834838867, 0.8916666507720947, 0.8932291865348816, 0.8932291865348816, 0.8932291269302368, 0.7598849748382459)
+Model: GWO-WOCLSA
+(0.3065011203289032, 0.8916666507720947, 0.8932291865348816, 0.8932291865348816, 0.8932291269302368, 0.7419122933141624)
+Model: WOA-WOCLSA
+(0.28521063923835754, 0.8916666507720947, 0.8932291865348816, 0.8932291865348816, 0.8932291269302368, 0.8109273903666427)
+Model: HHO-WOCLSA
+(0.3448748290538788, 0.8916666507720947, 0.8932291865348816, 0.8932291865348816, 0.8932291269302368, 0.5607476635514019)
+Model: FA-WOCLSA
+(0.2903612554073334, 0.8833333253860474, 0.8880208134651184, 0.8880208134651184, 0.8880207538604736, 0.8015815959741193)
+Model: CS-WOCLSA
+(0.28698205947875977, 0.8833333253860474, 0.8854166865348816, 0.8854166865348816, 0.8854166269302368, 0.8130841121495327)
+Model: BA-WOCLSA
+(0.3257499933242798, 0.8916666507720947, 0.8932291865348816, 0.8932291865348816, 0.8932291269302368, 0.6894320632638389)
