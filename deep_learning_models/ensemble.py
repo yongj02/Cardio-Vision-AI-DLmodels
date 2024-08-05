@@ -1,3 +1,4 @@
+'''
 from splitting_data import splitting_data
 from keras.api.models import Sequential
 from keras.api.layers import Dense, Dropout, Conv1D, MaxPooling1D, Flatten, LSTM, Bidirectional, Input
@@ -137,3 +138,4 @@ def ensemble(dataframe, target_col):
 
   # Print the evaluation results
   return ensemble_loss, ensemble_accuracy, ensemble_precision, ensemble_recall, ensemble_f1, ensemble_roc_auc
+'''

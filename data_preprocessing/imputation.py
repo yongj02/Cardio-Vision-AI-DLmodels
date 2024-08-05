@@ -71,7 +71,7 @@ def calculate_metrics(imputed_data, missing_info):
 
   return rmse, mae
 
-def imputation(df, imputer='MICE'):
+def imputation(df, target_col, imputer='MICE'):
   if imputer not in imputers:
     raise KeyError(f"{imputer} not in imputers")
   
@@ -79,7 +79,7 @@ def imputation(df, imputer='MICE'):
   encoders = label_encode_with_nan(df)
   df_clean = df.copy().dropna()
   df_clean.reset_index(drop=True, inplace=True)
-  df_clean = process_numerical_data(df_clean, standardise=False)
+  df_clean = process_numerical_data(df_clean, target_col, standardise=False)
 
   imputed_df = imputing_data(df, imputers[imputer])
   df = label_decoders(imputed_df, encoders)

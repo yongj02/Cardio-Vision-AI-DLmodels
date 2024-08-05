@@ -1,3 +1,4 @@
+'''
 from keras.api.models import Sequential
 from keras.api.layers import Dense, Dropout
 from sklearn.metrics import roc_auc_score
@@ -51,3 +52,4 @@ def MLP(num_of_iter, dataframe, target_col, test_size=0.8, random_state=42):
   mlp_roc_auc /= num_of_iter
 
   return mlp_loss, mlp_accuracy, mlp_precision, mlp_recall, mlp_f1, mlp_roc_auc
+'''
