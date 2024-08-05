@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from sklearn.metrics import roc_auc_score
-from .metrics import precision, recall, f1
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import label_binarize
+from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 import numpy as np
 from torch.utils.data.distributed import DistributedSampler
 
@@ -82,9 +82,16 @@ def cnnlstma(rank, world_size, dataframe, target_col, neuron1=2048, neuron2=1024
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.96)
 
     # Training loop
+    best_metrics = {'loss': float('inf'), 'accuracy': 0, 'precision': 0, 'recall': 0, 'f1': 0, 'roc_auc': 0}
     for epoch in range(100):
         model.train()
         train_sampler.set_epoch(epoch)
+        train_loss = 0.0
+        train_correct = 0
+        train_total = 0
+        train_predictions = []
+        train_true_labels = []
+
         for batch_X, batch_y in train_loader:
             batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             optimizer.zero_grad()
@@ -92,50 +99,67 @@ def cnnlstma(rank, world_size, dataframe, target_col, neuron1=2048, neuron2=1024
             loss = criterion(outputs, batch_y)
             loss.backward()
             optimizer.step()
+
+            train_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            train_total += batch_y.size(0)
+            train_correct += (predicted == batch_y).sum().item()
+            train_predictions.extend(predicted.cpu().numpy())
+            train_true_labels.extend(batch_y.cpu().numpy())
+
         scheduler.step()
 
-    # Evaluation
-    model.eval()
-    total_val_loss = 0
-    all_y_pred = []
-    all_y_true = []
-    outputs_prob = []
-    with torch.no_grad():
-        for batch_X, batch_y in valid_loader:
-            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-            outputs = model(batch_X)
-            loss = criterion(outputs, batch_y)
-            total_val_loss += loss.item()
+        # Validation
+        model.eval()
+        val_loss = 0.0
+        val_correct = 0
+        val_total = 0
+        val_predictions = []
+        val_true_labels = []
+        val_probs = []
 
-            # Get class predictions
-            _, predicted = torch.max(outputs, 1)
-            all_y_pred.extend(predicted.cpu().numpy())
-            all_y_true.extend(batch_y.cpu().numpy())
+        with torch.no_grad():
+            for batch_X, batch_y in valid_loader:
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                outputs = model(batch_X)
+                loss = criterion(outputs, batch_y)
 
-            # Get probabilities for ROC AUC
-            probs = torch.softmax(outputs, dim=1)[:, 1]
-            outputs_prob.extend(probs.cpu().numpy())
+                val_loss += loss.item()
+                _, predicted = torch.max(outputs.data, 1)
+                val_total += batch_y.size(0)
+                val_correct += (predicted == batch_y).sum().item()
+                val_predictions.extend(predicted.cpu().numpy())
+                val_true_labels.extend(batch_y.cpu().numpy())
+                val_probs.extend(torch.softmax(outputs, dim=1).cpu().numpy())
 
-    all_y_pred = np.array(all_y_pred)
-    all_y_true = np.array(all_y_true)
-    outputs_prob = np.array(outputs_prob)
+        # Calculate metrics
+        train_loss /= len(train_loader)
+        train_accuracy = train_correct / train_total
+        val_loss /= len(valid_loader)
+        val_accuracy = val_correct / val_total
 
-    # Loss
-    average_val_loss = total_val_loss / len(valid_loader)
+        val_precision = precision_score(val_true_labels, val_predictions, average='weighted', zero_division=0)
+        val_recall = recall_score(val_true_labels, val_predictions, average='weighted', zero_division=0)
+        val_f1 = f1_score(val_true_labels, val_predictions, average='weighted', zero_division=0)
 
-    # Accuracy
-    accuracy = (all_y_pred == all_y_true).mean()
+        # Calculate ROC AUC score (multi-class)
+        val_true_labels_bin = label_binarize(val_true_labels, classes=np.arange(len(classes)))
+        val_probs = np.array(val_probs)
+        
+        if len(classes) == 2:
+            val_roc_auc = roc_auc_score(val_true_labels_bin, val_probs[:, 1])
+        else:
+            val_roc_auc = roc_auc_score(val_true_labels_bin, val_probs, multi_class='ovr', average='weighted')
 
-    # Precision
-    precision_score = precision(all_y_true, all_y_pred)
+        # Update best metrics
+        if val_loss < best_metrics['loss']:
+            best_metrics = {
+                'loss': val_loss,
+                'accuracy': val_accuracy,
+                'precision': val_precision,
+                'recall': val_recall,
+                'f1': val_f1,
+                'roc_auc': val_roc_auc
+            }
 
-    # Recall
-    recall_score = recall(all_y_true, all_y_pred)
-
-    # F1 Score
-    f1_score = f1(all_y_true, all_y_pred)
-
-    # ROC_AUC Score
-    roc_auc = roc_auc_score(all_y_true, outputs_prob)
-
-    return average_val_loss, accuracy, precision_score, recall_score, f1_score, roc_auc, model
+    return best_metrics, model

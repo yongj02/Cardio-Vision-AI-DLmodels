@@ -53,7 +53,7 @@ def whale_optimization_algorithm(rank, world_size, dataframe, target_col, opts):
         results = evaluate_batch(rank, world_size, X.cpu().numpy(), dataframe, target_col)
         
         for i, result in enumerate(results):
-            fit[i, 0] = result[0]
+            fit[i, 0] = result[0]['loss']
             if fit[i, 0] < fitG:
                 Xgb[0, :] = X[i, :]
                 fitG = fit[i, 0].item()

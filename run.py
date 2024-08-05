@@ -80,8 +80,8 @@ if __name__ == '__main__':
     set_seed(42)
 
     # Reading datasets
-    filename = "balanced_dataset.xlsx"
-    fs_file = "./datasets/fs_balanced_dataset.txt"
+    filename = "arcene_data.csv"
+    fs_file = "./datasets/fs_arcene_data.txt"
     if filename == "balanced_dataset.xlsx":
       data = pd.read_excel('./datasets/' + filename)
     else:
