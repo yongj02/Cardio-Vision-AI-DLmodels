@@ -1,38 +1,29 @@
 import os
 import logging
-
-# Environment Variables
-os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-os.environ['PYTHON_INSTALLER_TYPE'] = 'pip'
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1'
-os.environ['OPENBLAS_NUM_THREADS'] = '1'
-os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
-os.environ['NUMEXPR_NUM_THREADS'] = '1'
-os.environ['USE_LIBUV'] = '0'
-os.environ['MASTER_ADDR'] = '127.0.0.1'
-os.environ['MASTER_PORT'] = '29500'
-
-import warnings
-warnings.filterwarnings("ignore", category=FutureWarning) # Suppress all FutureWarnings
-
-from deep_learning_models.woclsa import whale_optimization_algorithm
-from deep_learning_models.cnnlstma import cnnlstma
-# from deep_learning_models.ensemble import ensemble
-import pandas as pd
-from data_preprocessing.imputation import imputation
-from data_preprocessing.normalisation_encoding import process_numerical_data, encode_non_numerical_data
-from data_preprocessing.feature_selection.execute_fs import execute_fs
-import datetime
-import time
-import math
 import random
 import numpy as np
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
+# Setting Environment Variables
+os.environ['USE_LIBUV'] = '0'
+os.environ['MASTER_ADDR'] = '127.0.0.1'
+os.environ['MASTER_PORT'] = '29500'
+os.environ['PYTHONHASHSEED'] = '42'  # Ensure this is set for reproducibility
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)  # Suppress all FutureWarnings
+
+# Importing Modules
+from deep_learning_models.woclsa import whale_optimization_algorithm
+from data_preprocessing.imputation import imputation
+from data_preprocessing.normalisation_encoding import process_numerical_data, encode_non_numerical_data
+from data_preprocessing.feature_selection.execute_fs import execute_fs
+import pandas as pd
+import datetime
+import time
+import math
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -51,6 +42,9 @@ def main(rank, world_size, model, df, target, fs_file):
     os.environ['MASTER_PORT'] = '12345'
     dist.init_process_group("gloo", rank=rank, world_size=world_size)
 
+    # Setting the seed for each process
+    set_seed(42 + rank)
+
     content = "\n"
     # WOCLSA
     opts = {
@@ -68,8 +62,16 @@ def main(rank, world_size, model, df, target, fs_file):
     end_time = time.time()
     duration = int(np.round((end_time - start_time) / 60))
 
+    # Check memory consumption after the algorithm runs
+    allocated_memory = torch.cuda.memory_allocated(device=f'cuda:{rank}') / (1024**3)  # in GB
+    reserved_memory = torch.cuda.memory_reserved(device=f'cuda:{rank}') / (1024**3)    # in GB
+    max_allocated_memory = torch.cuda.max_memory_allocated(device=f'cuda:{rank}') / (1024**3)  # in GB
+    max_reserved_memory = torch.cuda.max_memory_reserved(device=f'cuda:{rank}') / (1024**3)    # in GB
+
     if rank == 0:
         content = f"\nModel: {model}WOCLSA ({duration})\n{str(results[:-1])}"
+        content += f"\nMemory usage after whale_optimization_algorithm: Allocated: {allocated_memory:.2f} GB, Reserved: {reserved_memory:.2f} GB"
+        content += f"\nMax memory usage: Allocated: {max_allocated_memory:.2f} GB, Reserved: {max_reserved_memory:.2f} GB\n"
         with open(fs_file, 'a') as f:
             f.write(content)
     
