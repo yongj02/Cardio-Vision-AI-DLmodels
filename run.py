@@ -4,6 +4,7 @@ import random
 import numpy as np
 import torch
 import torch.distributed as dist
+from torch.distributed import Backend
 import torch.multiprocessing as mp
 
 # Setting Environment Variables
@@ -40,7 +41,7 @@ def set_seed(seed):
 def main(rank, world_size, model, df, target, fs_file):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12345'
-    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+    dist.init_process_group(backend=Backend.NCLL, rank=rank, world_size=world_size)
 
     # Setting the seed for each process
     set_seed(42 + rank)
