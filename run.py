@@ -41,7 +41,7 @@ def set_seed(seed):
 def main(rank, world_size, model, df, target, fs_file):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12345'
-    dist.init_process_group(backend=Backend.NCCL, rank=rank, world_size=world_size)
+    dist.init_process_group(backend=Backend.NCCL, init_method='env://', rank=rank, world_size=world_size)
 
     # Setting the seed for each process
     set_seed(42 + rank)
