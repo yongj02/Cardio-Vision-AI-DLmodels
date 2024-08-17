@@ -71,7 +71,7 @@ def main(rank, world_size, model, df, target, fs_file):
 
     if rank == 0:
         content = f"\nModel: {model}WOCLSA ({duration})\n{str(results[:-1])}"
-        content += f"\nMemory usage after whale_optimization_algorithm: Allocated: {allocated_memory:.2f} GB, Reserved: {reserved_memory:.2f} GB"
+        content += f"\nMemory usage: Allocated: {allocated_memory:.2f} GB, Reserved: {reserved_memory:.2f} GB"
         content += f"\nMax memory usage: Allocated: {max_allocated_memory:.2f} GB, Reserved: {max_reserved_memory:.2f} GB\n"
         with open(fs_file, 'a') as f:
             f.write(content)

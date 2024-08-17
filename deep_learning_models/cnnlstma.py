@@ -8,6 +8,7 @@ from sklearn.preprocessing import label_binarize
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 import numpy as np
 from torch.utils.data.distributed import DistributedSampler
+import math
 
 class CNNLSTMA(nn.Module):
     def __init__(self, input_dim, num_classes, neuron1=2048, neuron2=1024, dropout_rate=0.15):
@@ -38,7 +39,7 @@ def cnnlstma(rank, world_size, dataframe, target_col, neuron1=2048, neuron2=1024
     torch.cuda.set_device(rank)
     device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
     
-    batch_size = int(batch_size)
+    batch_size = math.floor(batch_size * 0.75)
     
     # Prepare the data
     label_encoder = LabelEncoder().fit(dataframe[target_col])
