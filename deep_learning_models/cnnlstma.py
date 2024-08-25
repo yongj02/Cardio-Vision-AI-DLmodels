@@ -39,7 +39,7 @@ def cnnlstma(rank, world_size, dataframe, target_col, neuron1=2048, neuron2=1024
     torch.cuda.set_device(rank)
     device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
     
-    batch_size = math.floor(batch_size * 0.75)
+    batch_size = math.floor(batch_size * 1)
     
     # Prepare the data
     label_encoder = LabelEncoder().fit(dataframe[target_col])

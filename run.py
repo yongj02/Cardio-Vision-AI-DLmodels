@@ -41,7 +41,7 @@ def set_seed(seed):
 def main(rank, world_size, model, df, target, fs_file):
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = '12345'
-    dist.init_process_group(backend=Backend.NCCL, init_method='env://', rank=rank, world_size=world_size)
+    dist.init_process_group(backend='gloo', init_method='env://', rank=rank, world_size=world_size)
 
     # Setting the seed for each process
     set_seed(42 + rank)
@@ -83,8 +83,8 @@ if __name__ == '__main__':
     set_seed(42)
 
     # Reading datasets
-    filename = "arcene_data.csv"
-    fs_file = "./datasets/fs_arcene_data.txt"
+    filename = "balanced_dataset.xlsx"
+    fs_file = "./datasets/fs_balanced_dataset.txt"
     if filename == "balanced_dataset.xlsx":
       data = pd.read_excel('./datasets/' + filename)
     else:
