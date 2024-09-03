@@ -10,7 +10,7 @@ import torch.multiprocessing as mp
 # Setting Environment Variables
 os.environ['USE_LIBUV'] = '0'
 os.environ['MASTER_ADDR'] = '127.0.0.1'
-os.environ['MASTER_PORT'] = '29500'
+os.environ['MASTER_PORT'] = '28388'
 os.environ['PYTHONHASHSEED'] = '42'  # Ensure this is set for reproducibility
 
 import warnings
@@ -40,7 +40,6 @@ def set_seed(seed):
 
 def main(rank, world_size, model, df, target, fs_file):
     os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12345'
     dist.init_process_group(backend=Backend.NCCL, init_method='env://', rank=rank, world_size=world_size)
 
     # Setting the seed for each process
