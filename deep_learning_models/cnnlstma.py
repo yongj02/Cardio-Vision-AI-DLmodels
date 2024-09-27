@@ -7,7 +7,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import confusion_matrix, roc_auc_score
 import numpy as np
-import torch.nn.functional as F
+from torch.utils.data.distributed import DistributedSampler
+import math
 
 class CNNLSTMA(nn.Module):
     def __init__(self, input_dim, num_classes, neuron1=2048, neuron2=1024, dropout_rate=0.15):
@@ -22,21 +23,22 @@ class CNNLSTMA(nn.Module):
         self.fc3 = nn.Linear(neuron2, num_classes)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.max_pool1d(x, 2)
-        x = F.relu(self.conv2(x))
-        x = F.max_pool1d(x, 2)
+        x = torch.relu(self.conv1(x))
+        x = nn.functional.max_pool1d(x, 2)
+        x = torch.relu(self.conv2(x))
+        x = nn.functional.max_pool1d(x, 2)
         x, _ = self.lstm(x.transpose(1, 2))
         x = self.flatten(x)
         x = self.dropout(x)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
         x = self.fc3(x)
         return x
 
-def cnnlstma(dataframe, target_col, neuron1=2048, neuron2=1024, batch_size=32, dropout_rate=0.15):
+def cnnlstma(rank, world_size, dataframe, target_col, neuron1=2048, neuron2=1024, batch_size=32, dropout_rate=0.15):
+    torch.cuda.set_device(rank)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    batch_size = int(batch_size)
+    batch_size = math.floor(batch_size * 1)
 
     # Prepare the data
     label_encoder = LabelEncoder().fit(dataframe[target_col])
@@ -54,25 +56,29 @@ def cnnlstma(dataframe, target_col, neuron1=2048, neuron2=1024, batch_size=32, d
     X_valid = scaler.transform(X_valid)
 
     # Convert to PyTorch tensors
-    X_train = torch.FloatTensor(X_train).unsqueeze(1).to(device)
-    X_valid = torch.FloatTensor(X_valid).unsqueeze(1).to(device)
-    y_train = torch.LongTensor(y_train).to(device)
-    y_valid = torch.LongTensor(y_valid).to(device)
+    X_train = torch.FloatTensor(X_train).unsqueeze(1)
+    X_valid = torch.FloatTensor(X_valid).unsqueeze(1)
+    y_train = torch.LongTensor(y_train)
+    y_valid = torch.LongTensor(y_valid)
 
     # Create datasets
     train_dataset = TensorDataset(X_train, y_train)
     valid_dataset = TensorDataset(X_valid, y_valid)
 
-    # Create DataLoaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+    # Create DistributedSampler
+    train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
+    valid_sampler = DistributedSampler(valid_dataset, num_replicas=world_size, rank=rank)
+
+    # Create DataLoaders with DistributedSampler
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=train_sampler)
+    valid_loader = DataLoader(valid_dataset, batch_size=batch_size, sampler=valid_sampler)
 
     # Initialize the model
     model = CNNLSTMA(X_train.shape[2], len(classes), neuron1, neuron2, dropout_rate).to(device)
 
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, nesterov=True)
+    optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.96)
 
     # Training loop
@@ -107,7 +113,7 @@ def cnnlstma(dataframe, target_col, neuron1=2048, neuron2=1024, batch_size=32, d
                 val_loss += loss.item()
 
                 # Apply softmax to get probabilities for each class
-                probs = F.softmax(outputs, dim=1)
+                probs = torch.softmax(outputs, dim=1)
 
                 # Append the predicted probabilities to val_probs
                 val_probs.extend(probs.cpu().numpy())
