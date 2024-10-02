@@ -17,7 +17,9 @@ import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)  # Suppress all FutureWarnings
 
 # Importing Modules
-from deep_learning_models.woclsa import whale_optimization_algorithm
+from deep_learning_models.cnnlstma import cnnlstma
+from deep_learning_models.ensemble import ensemble
+from deep_learning_models.woclsa import woclsa
 from data_preprocessing.imputation import imputation
 from data_preprocessing.normalisation_encoding import process_numerical_data, encode_non_numerical_data
 from data_preprocessing.feature_selection.execute_fs import execute_fs
@@ -58,7 +60,7 @@ def main(rank, world_size, model, df, target, fs_file):
     print("Current time:", datetime.datetime.now())
     print(f"Current model: {model}WOCLSA")
     start_time = time.time()
-    results = whale_optimization_algorithm(rank, world_size, df, target, opts)
+    results = woclsa(rank, world_size, df, target, opts)
     end_time = time.time()
     duration = int(np.round((end_time - start_time) / 60))
 
@@ -112,6 +114,10 @@ if __name__ == '__main__':
       df[target] = df[target].map({'Toxic': 1, 'NonToxic': 0})
     elif filename == "arcene_data.csv":
       target = 'labels'
+    elif filename == "malicious_executable.csv":
+       target = 'Label'
+    elif filename == 'semeion_dataset.csv':
+       target = 'Label'
     # print(df.head())
 
     # Imputation
@@ -145,7 +151,7 @@ if __name__ == '__main__':
         if start_idx != -1 and end_idx != -1:
           string_list = line[start_idx:end_idx+1]
           best_features.append(eval(string_list))
-
+    
     models = ["GA-", "RF-", "RFE-", "RFECV-", "GWO-", "WOA-", "HHO-", "FA-", "CS-", "BA-"]
 
     '''

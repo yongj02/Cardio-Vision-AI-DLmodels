@@ -1,141 +1,197 @@
-'''
-from splitting_data import splitting_data
-from keras.api.models import Sequential
-from keras.api.layers import Dense, Dropout, Conv1D, MaxPooling1D, Flatten, LSTM, Bidirectional, Input
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, log_loss
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import roc_auc_score, log_loss, confusion_matrix, accuracy_score
 import numpy as np
+from splitting_data import splitting_data
 
+# Check if GPU is available
+device = torch.device("cpu")
 
 def ensemble(dataframe, target_col):
-  X = dataframe.drop(columns=[target_col], axis=1)
-  y = dataframe[target_col]
+    label_encoder = LabelEncoder().fit(dataframe[target_col])
+    labels = label_encoder.transform(dataframe[target_col])
+    classes = list(label_encoder.classes_)
 
-  X_train, y_train, X_test, y_test = splitting_data(X, y, train_size=0.8, random_state=42, require_val=False)
+    X = dataframe.drop(columns=[target_col], axis=1)
+    y = labels
 
-  # number of features in the dataset
-  n_features = X_train.shape[1]
+    if len(classes) == 2:
+        loss_function = nn.BCELoss()
+        activation_function = nn.Sigmoid()
+        output_nodes = 1
+    else:
+        loss_function = nn.CrossEntropyLoss()
+        activation_function = nn.Softmax(dim=1)
+        output_nodes = len(classes)
 
-  # Reshaping the data
-  X_train_reshaped = X_train.values.reshape((X_train.shape[0], X_train.shape[1], 1))
-  X_train_reshaped = np.array([np.array(sample).reshape(-1, 1) for sample in X_train_reshaped])
+    X_train, y_train, X_test, y_test = splitting_data(X, y, train_size=0.8, random_state=42, require_val=False)
 
-  X_test_reshaped = X_test.values.reshape((X_test.shape[0], X_test.shape[1], 1))
-  X_test_reshaped = np.array([np.array(sample).reshape(-1, 1) for sample in X_test_reshaped])
+    n_features = X_train.shape[1]
 
-  # DNN Model
-  def create_dnn_model(input_dim):
-    model = Sequential()
-    model.add(Input(shape=(input_dim,)))
-    model.add(Dense(100, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(128, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(1, activation='sigmoid'))
+    # Convert to PyTorch tensors and move to device
+    X_train_tensor = torch.FloatTensor(X_train.values).to(device)
+    y_train_tensor = torch.LongTensor(y_train).to(device)
+    X_test_tensor = torch.FloatTensor(X_test.values).to(device)
+    y_test_tensor = torch.LongTensor(y_test).to(device)
 
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    return model
+    # DNN Model
+    class DNNModel(nn.Module):
+        def __init__(self, input_dim, output_nodes):
+            super(DNNModel, self).__init__()
+            self.fc1 = nn.Linear(input_dim, 100)
+            self.fc2 = nn.Linear(100, 64)
+            self.fc3 = nn.Linear(64, 128)
+            self.fc4 = nn.Linear(128, output_nodes)
+            self.dropout = nn.Dropout(0.2)
+            self.activation = activation_function
 
-  dnn_model = create_dnn_model(n_features)
+        def forward(self, x):
+            x = torch.relu(self.fc1(x))
+            x = self.dropout(x)
+            x = torch.relu(self.fc2(x))
+            x = self.dropout(x)
+            x = torch.relu(self.fc3(x))
+            x = self.dropout(x)
+            x = self.fc4(x)
+            return self.activation(x)
 
-  # CNN Model
-  def create_cnn_model(input_shape):
-    model = Sequential()
-    model.add(Input(shape=input_shape))
-    model.add(Conv1D(64, kernel_size=3, activation='relu'))
-    model.add(MaxPooling1D(pool_size=2))
-    model.add(Dropout(0.2))
-    model.add(Flatten())
-    model.add(Dense(128, activation='relu'))
-    model.add(Dense(64, activation='relu'))
-    model.add(Dropout(0.2))
-    model.add(Dense(1, activation='sigmoid'))
+    # CNN Model
+    class CNNModel(nn.Module):
+        def __init__(self, input_shape, output_nodes):
+            super(CNNModel, self).__init__()
+            self.conv1 = nn.Conv1d(1, 64, kernel_size=3, padding=1)
+            self.pool = nn.MaxPool1d(2)
+            self.flatten = nn.Flatten()
+            self.fc1 = nn.Linear(64 * (input_shape // 2), 128)
+            self.fc2 = nn.Linear(128, 64)
+            self.fc3 = nn.Linear(64, output_nodes)
+            self.dropout = nn.Dropout(0.2)
+            self.activation = activation_function
 
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    return model
+        def forward(self, x):
+            x = x.unsqueeze(1)  # Add channel dimension
+            x = self.pool(torch.relu(self.conv1(x)))
+            x = self.flatten(x)
+            x = torch.relu(self.fc1(x))
+            x = torch.relu(self.fc2(x))
+            x = self.dropout(x)
+            x = self.fc3(x)
+            return self.activation(x)
 
-  cnn_model = create_cnn_model((n_features, 1))
+    # RNN Model
+    class RNNModel(nn.Module):
+        def __init__(self, input_shape, output_nodes):
+            super(RNNModel, self).__init__()
+            self.lstm = nn.LSTM(input_size=1, hidden_size=128, batch_first=True)
+            self.dropout = nn.Dropout(0.2)
+            self.fc = nn.Linear(128, output_nodes)
+            self.activation = activation_function
 
-  # RNN Model
-  def create_rnn_model(input_shape):
-    model = Sequential()
-    model.add(Input(shape=input_shape))
-    model.add(LSTM(128, dropout=0.2, recurrent_dropout=0.2))
-    model.add(Dropout(0.2))
-    model.add(Dense(1, activation='sigmoid'))
+        def forward(self, x):
+            x = x.unsqueeze(2)  # Add feature dimension (batch_size, sequence_length, 1)
+            x, _ = self.lstm(x)
+            x = x[:, -1, :]  # Take the last time step
+            x = self.dropout(x)
+            x = self.fc(x)
+            return self.activation(x)
 
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    return model
+    # BiRNN Model
+    class BiRNNModel(nn.Module):
+        def __init__(self, input_shape, output_nodes):
+            super(BiRNNModel, self).__init__()
+            self.lstm = nn.LSTM(input_size=1, hidden_size=128, batch_first=True, bidirectional=True)
+            self.dropout = nn.Dropout(0.2)
+            self.fc = nn.Linear(256, output_nodes)
+            self.activation = activation_function
 
-  rnn_model = create_rnn_model((n_features, 1))
+        def forward(self, x):
+            x = x.unsqueeze(2)  # Add feature dimension (batch_size, sequence_length, 1)
+            x, _ = self.lstm(x)
+            x = x[:, -1, :]  # Take the last time step
+            x = self.dropout(x)
+            x = self.fc(x)
+            return self.activation(x)
 
-  # BiRNN Model
-  def create_birnn_model(input_shape):
-    model = Sequential()
-    model.add(Input(shape=input_shape))
-    model.add(Bidirectional(LSTM(128, dropout=0.2, recurrent_dropout=0.2)))
-    model.add(Dropout(0.2))
-    model.add(Dense(1, activation='sigmoid'))
+    def train_model(model, X_train, y_train, batch_size, epochs):
+        model.to(device)  # Move model to GPU if available
+        optimizer = optim.Adam(model.parameters())
+        dataset = TensorDataset(X_train, y_train)
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-    return model
+        for epoch in range(epochs):
+            model.train()
+            for batch_X, batch_y in dataloader:
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                optimizer.zero_grad()
+                outputs = model(batch_X)
+                loss = loss_function(outputs.squeeze(), batch_y.float() if len(classes) == 2 else batch_y)
+                loss.backward()
+                optimizer.step()
 
-  birnn_model = create_birnn_model((n_features, 1))
+    batch_size = 32
+    epochs = 100
 
-  # Assuming X_train and y_train are your training data and labels
-  batch_size = 32
-  epochs = 100
+    dnn_model = DNNModel(n_features, output_nodes).to(device)
+    cnn_model = CNNModel(n_features, output_nodes).to(device)
+    rnn_model = RNNModel(n_features, output_nodes).to(device)
+    birnn_model = BiRNNModel(n_features, output_nodes).to(device)
 
-  # Training DNN Model
-  dnn_model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, validation_split=0.2, verbose=0)
+    train_model(dnn_model, X_train_tensor, y_train_tensor, batch_size, epochs)
+    train_model(cnn_model, X_train_tensor, y_train_tensor, batch_size, epochs)
+    train_model(rnn_model, X_train_tensor, y_train_tensor, batch_size, epochs)
+    train_model(birnn_model, X_train_tensor, y_train_tensor, batch_size, epochs)
 
-  # Training CNN Model
-  cnn_model.fit(X_train_reshaped, y_train, batch_size=batch_size, epochs=epochs, validation_split=0.2, verbose=0)
+    def create_ensemble_predictions(models, X_test):
+        predictions = []
+        for model in models:
+            model.eval()
+            with torch.no_grad():
+                pred = model(X_test)
+                predictions.append(pred.cpu().numpy())
+        stacked_predictions = np.stack(predictions, axis=-1)
+        ensemble_predictions = np.mean(stacked_predictions, axis=-1)
+        return ensemble_predictions
 
-  # Training RNN Model
-  rnn_model.fit(X_train_reshaped, y_train, batch_size=batch_size, epochs=epochs, validation_split=0.2, verbose=0)
+    models = [dnn_model, cnn_model, rnn_model, birnn_model]
+    ensemble_predictions = create_ensemble_predictions(models, X_test_tensor)
 
-  # Training BiRNN Model
-  birnn_model.fit(X_train_reshaped, y_train, batch_size=batch_size, epochs=epochs, validation_split=0.2, verbose=0)
+    if len(classes) == 2:
+        ensemble_predictions_labels = (ensemble_predictions > 0.5).astype(int)
+    else:
+        ensemble_predictions_labels = np.argmax(ensemble_predictions, axis=-1)
 
-  # Build the ensemble model
-  def create_ensemble_predictions(models, X_test):
-    # Get predictions from each model
-    predictions = [model.predict(X_test) for model in models]
+    ensemble_loss = log_loss(y_test, ensemble_predictions)
 
-    # Stack predictions and compute the average
-    stacked_predictions = np.stack(predictions, axis=-1)
-    ensemble_predictions = np.mean(stacked_predictions, axis=-1)
+    if len(classes) == 2:
+        ensemble_roc_auc = roc_auc_score(y_test, ensemble_predictions)
+    else:
+        ensemble_roc_auc = roc_auc_score(y_test, ensemble_predictions, multi_class='ovr')
 
-    return ensemble_predictions
+    y_pred_classes = np.argmax(ensemble_predictions, axis=1)
+    y_true_classes = y_test
 
-  # List of trained models
-  models = [dnn_model, cnn_model, rnn_model, birnn_model]
+    conf_matrix = confusion_matrix(y_true_classes, y_pred_classes)
 
-  # Assuming X_test is your test data
-  ensemble_predictions = create_ensemble_predictions(models, X_test_reshaped)
+    tp_per_class = []
+    fp_per_class = []
+    tn_per_class = []
+    fn_per_class = []
 
-  ensemble_predictions_binary = (ensemble_predictions > 0.5).astype(int)
+    for i in range(len(classes)):
+        tp = conf_matrix[i, i]
+        fp = conf_matrix[:, i].sum() - tp
+        fn = conf_matrix[i, :].sum() - tp
+        tn = conf_matrix.sum() - (tp + fp + fn)
 
-  # Calculate accuracy
-  ensemble_accuracy = accuracy_score(y_test, ensemble_predictions_binary)
+        tp_per_class.append(tp)
+        fp_per_class.append(fp)
+        tn_per_class.append(tn)
+        fn_per_class.append(fn)
 
-  # Calculate Precision
-  ensemble_precision = precision_score(y_test, ensemble_predictions_binary)
+    accuracy = accuracy_score(y_true_classes, y_pred_classes)
+    print(accuracy)
 
-  # Calculate Recall
-  ensemble_recall = recall_score(y_test, ensemble_predictions_binary)
-
-  # Calculate F1 Score
-  ensemble_f1 = f1_score(y_test, ensemble_predictions_binary)
-
-  # Calculate AUC-ROC
-  ensemble_roc_auc = roc_auc_score(y_test, ensemble_predictions)
-
-  # Calculate Loss
-  ensemble_loss = log_loss(y_test, ensemble_predictions)
-
-  # Print the evaluation results
-  return ensemble_loss, ensemble_accuracy, ensemble_precision, ensemble_recall, ensemble_f1, ensemble_roc_auc
-'''
+    return ensemble_loss, ensemble_roc_auc, tp_per_class, fp_per_class, tn_per_class, fn_per_class

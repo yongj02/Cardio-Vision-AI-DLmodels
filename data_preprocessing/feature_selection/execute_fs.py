@@ -15,12 +15,10 @@ import numpy as np
 fs = [ga_feature_selection, rf_feature_selection, rfe_feature_selection, rfecv_feature_selection, gwo_feature_selection,
       woa_feature_selection, hho_feature_selection, fa_feature_selection, cs_feature_selection, ba_feature_selection]
 
-# fs = [rfecv_feature_selection]
-
 best_features = [None] * len(fs)
 models = [None] * len(fs)
 
-print_fs = False
+print_fs = True
 
 def execute_fs(df, target):
     best_k = find_best_k(df.drop(columns=[target], axis=1), df[target])

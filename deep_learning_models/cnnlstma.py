@@ -37,7 +37,7 @@ class CNNLSTMA(nn.Module):
 
 def cnnlstma(rank, world_size, dataframe, target_col, neuron1=2048, neuron2=1024, batch_size=32, dropout_rate=0.15):
     torch.cuda.set_device(rank)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{rank}" if torch.cuda.is_available() else "cpu")
     batch_size = math.floor(batch_size * 1)
 
     # Prepare the data
@@ -85,9 +85,11 @@ def cnnlstma(rank, world_size, dataframe, target_col, neuron1=2048, neuron2=1024
     best_metrics = {'loss': float('inf'), 'roc_auc': 0, 'TP': None, 'FP': None, 'TN': None, 'FN': None}
     for epoch in range(100):
         model.train()
+        train_sampler.set_epoch(epoch)
         train_loss = 0.0
 
         for batch_X, batch_y in train_loader:
+            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             optimizer.zero_grad()
             outputs = model(batch_X)
             loss = criterion(outputs, batch_y)
@@ -107,6 +109,7 @@ def cnnlstma(rank, world_size, dataframe, target_col, neuron1=2048, neuron2=1024
 
         with torch.no_grad():
             for batch_X, batch_y in valid_loader:
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
                 outputs = model(batch_X)
                 loss = criterion(outputs, batch_y)
 

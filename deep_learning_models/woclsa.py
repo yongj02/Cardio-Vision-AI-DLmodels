@@ -4,6 +4,7 @@ import torch.distributed as dist
 from numpy.random import rand
 from deep_learning_models.cnnlstma import cnnlstma
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ def evaluate_batch(rank, world_size, positions, dataframe, target_col):
         results.append(result)
     return results
 
-def whale_optimization_algorithm(rank, world_size, dataframe, target_col, opts):
+def woclsa(rank, world_size, dataframe, target_col, opts):
     device = torch.device(f'cuda:{rank}' if torch.cuda.is_available() else 'cpu')
     
     lb, ub = opts['lb'], opts['ub']
@@ -34,6 +35,8 @@ def whale_optimization_algorithm(rank, world_size, dataframe, target_col, opts):
     Xgb = torch.zeros(1, dim, dtype=torch.int32, device=device)
     fitG = float('inf')
     best_result = None
+    l = 1
+    prev_time = time.time()
 
     for t in range(max_iter):
         if t > 0:
@@ -50,7 +53,11 @@ def whale_optimization_algorithm(rank, world_size, dataframe, target_col, opts):
                     k = -1 + 2 * rand()
                     X[i] = torch.tensor([boundary(int(abs(Xgb[0,d].item() - X[i,d].item()) * np.exp(b * k) * np.cos(2 * np.pi * k) + Xgb[0,d].item()), lb[d], ub[d]) for d in range(dim)], device=device)
 
+        print(f"Generation: {l}/{max_iter}")
         results = evaluate_batch(rank, world_size, X.cpu().numpy(), dataframe, target_col)
+        print(f"Duration: {int(np.round((time.time() - prev_time) / 60))} min")
+        prev_time = time.time()
+        l += 1
         
         for i, result in enumerate(results):
             fit[i, 0] = result[0]['loss']

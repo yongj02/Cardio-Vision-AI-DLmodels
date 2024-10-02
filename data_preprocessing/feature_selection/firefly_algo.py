@@ -80,7 +80,7 @@ def fa_jfs(xtrain, ytrain, opts, print_fs):
     curve[0,t] = fitG.copy()
     if print_fs:
         print("Iteration:", t + 1)
-        print("Best (HHO):", curve[0,t])
+        print("Best (FA):", curve[0,t])
     t += 1
 
     while t < max_iter:
@@ -127,7 +127,7 @@ def fa_jfs(xtrain, ytrain, opts, print_fs):
         curve[0,t] = fitG.copy()
         if print_fs:
             print("Iteration:", t + 1)
-            print("Best (HHO):", curve[0,t])
+            print("Best (FA):", curve[0,t])
         t += 1
 
 

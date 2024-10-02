@@ -62,7 +62,7 @@ def ga_train_model(x_train, x_test, y_train, y_test, predictor_names):
     mdl = RandomForestClassifier(random_state=1)
     mdl.fit(x_train, y_train)
     y_hat = mdl.predict(x_test)
-    prec = precision_score(y_test, y_hat, zero_division=0)
+    prec = precision_score(y_test, y_hat, zero_division=0, average='macro')
     return prec
 
 def choose_parents(population, accuracy, elite_percent):
@@ -71,7 +71,11 @@ def choose_parents(population, accuracy, elite_percent):
     top_perc = ind_ac[:elite_num]
     elite_population = population[top_perc, :]
 
-    weight_norm = accuracy / accuracy.sum()
+    if accuracy.sum() == 0:
+        weight_norm = np.ones_like(accuracy) / len(accuracy)
+    else:
+        weight_norm = accuracy / accuracy.sum()
+    
     weight_comu = weight_norm.cumsum()
 
     num_parents_wo_elite = population.shape[0] - elite_num
@@ -101,8 +105,7 @@ def ga_feature_selection(dataframe, target_col, min_features=5, population_size=
     predictor_names = data_predictors.columns
     for i in range(population_size):
         predictor_names_i = predictor_names[population[i,:]==1]
-        accuracy_i = ga_train_model(X_train,X_test,y_train,y_test,predictor_names_i)
-        accuracy[i] = accuracy_i
+        accuracy[i] = ga_train_model(X_train,X_test,y_train,y_test,predictor_names_i)
 
     gen = 0
     best_acc_i = np.zeros(max_iterations)

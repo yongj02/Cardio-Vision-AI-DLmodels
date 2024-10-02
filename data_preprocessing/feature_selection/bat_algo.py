@@ -89,7 +89,7 @@ def ba_jfs(xtrain, ytrain, opts, print_fs):
     curve[0,t] = fitG.copy()
     if print_fs:
         print("Iteration:", t + 1)
-        print("Best (HHO):", curve[0,t])
+        print("Best (BA):", curve[0,t])
     t += 1
 
     # Initial loudness [1 ~ 2] & pulse rate [0 ~ 1]
@@ -145,7 +145,7 @@ def ba_jfs(xtrain, ytrain, opts, print_fs):
         curve[0,t] = fitG.copy()
         if print_fs:
             print("Iteration:", t + 1)
-            print("Best (HHO):", curve[0,t])
+            print("Best (BA):", curve[0,t])
         t += 1
 
 
